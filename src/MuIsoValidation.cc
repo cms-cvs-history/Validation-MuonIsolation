@@ -10,13 +10,13 @@
 
  Implementation: This code will accept a data set and generate plots of
 	various quantities relevent to the Muon Isolation module. We will 
-	be using the MuIsoDeposit class, *not* the MuonIsolation struct.
+	be using the IsoDeposit class, *not* the MuonIsolation struct.
 	 
 	The sequence of events is... 
  		* initalize statics (which variables to plot, axis limtis, etc.)
  		* run over events
  			* for each event, run over the muons in that event
- 				*record MuIsoDeposit data
+ 				*record IsoDeposit data
  		* transfer data to histograms, profile plots
  		* save histograms to a root file
  		
@@ -138,7 +138,7 @@ void MuIsoValidation::InitStatics(){
 
 	//-------Initialize Titles---------
 	title_sam = "";//"[Sample b-jet events] ";
-	title_cone = "";//" [in R=0.3 MuIsoDeposit Cone]";
+	title_cone = "";//" [in R=0.3 IsoDeposit Cone]";
 	//The above two pieces of info will be printed on the title of the whole page,
 	//not for each individual histogram
 	title_cd = "Cum Dist of ";
@@ -184,6 +184,7 @@ void MuIsoValidation::InitStatics(){
 	names[4 ] = "nTracks";
 	names[5 ] = "nEMtowers";
 	names[6 ] = "nHADtowers";
+
 	names[7 ] = "nHOtowers";
 	names[8 ] = "muonPt";
 	names[9 ] = "avgPt";
@@ -236,7 +237,7 @@ void MuIsoValidation::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 	edm::Handle<reco::MuonCollection> muonsHandle; //this is an instance of std:vector<muon> . It has methods begin(), end(), size(), etc.
 	iEvent.getByLabel(Muon_Tag, muonsHandle);
 
-	// Get MuIsoDeposit Collection 
+	// Get IsoDeposit Collection 
 	MuIsoDepHandle ctfIsoHandle;
 	MuIsoDepHandle ecalIsoHandle;
 	MuIsoDepHandle hcalIsoHandle;
@@ -251,9 +252,11 @@ void MuIsoValidation::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 	theMuonData.push_back(muonsHandle->size());
 
 	//Fill historgams concerning muon isolation 
-	for (MuonIterator muon = muonsHandle->begin(); muon != muonsHandle->end(); ++muon ) {
+	uint iMuon=0;
+	for (MuonIterator muon = muonsHandle->begin(); muon != muonsHandle->end(); ++muon, ++iMuon ) {
 		++nMuons;
-	
+		if (muon->combinedMuon().isNull()) continue;
+		//		edm::RefToBase<reco::Candidate> muRef(muonsHandle->refAt(iMuon));
 		MuIsoDepRef& ctfDep  = ( *ctfIsoHandle)[muon->combinedMuon()];
 		MuIsoDepRef& ecalDep = (*ecalIsoHandle)[muon->combinedMuon()];
 		MuIsoDepRef& hcalDep = (*hcalIsoHandle)[muon->combinedMuon()];
@@ -280,7 +283,7 @@ void MuIsoValidation::RecordData(MuonIterator muon,
 	the1Ddata[6].push_back(hcalDep.depositAndCountWithin(0.3).second);
 	the1Ddata[7].push_back(hoDep.depositAndCountWithin(0.3).second);
 	
-	the1Ddata[8].push_back(muon->combinedMuon()->pt());
+	the1Ddata[8].push_back(muon->pt());
 	the1Ddata[9].push_back(
 		(the1Ddata[4].back() != 0) ? 
 		(the1Ddata[0].back() / the1Ddata[4].back()) : 
@@ -518,63 +521,67 @@ void MuIsoValidation::FillHistos() {
 }
 
 TH1* MuIsoValidation::GetTH1FromMonitorElement(MonitorElement* me) {
-	MonitorElementRootH1* meH1 = dynamic_cast<MonitorElementRootH1*> (me);
-	if(meH1 == 0){
-		edm::LogInfo("Tutorial") << "\n\nDynamic Cast error #1 !!!!!!!!\n\n";
-		return (TH1*)0;
-	}
-	else{
-		//(*meH1) is a MonitorElementRootH1
-		//*(*meH1) is of type TNamed, although is actually a TH1::TNamed
-		//&(*(*meH1)) is of type TNamed*
-		TNamed* named_histo = &(*(*meH1));
-		TH1* histo = dynamic_cast<TH1*> (named_histo);
-		if(histo == 0){
-			edm::LogInfo("Tutorial") << "\n\nDynamic Cast error #2 !!!!!!!!\n\n";
-			return (TH1*)0;
-		}
-		else{
-			return histo;
-		}
-	}
+  // Nice way to do it for 2_0_0
+  //  return me->getTH1();
+  MonitorElementRootH1* meH1 = dynamic_cast<MonitorElementRootH1*> (me);
+  if(meH1 == 0){
+    edm::LogInfo("Tutorial") << "\n\nDynamic Cast error #1 !!!!!!!!\n\n";
+    return (TH1*)0;
+  }
+  else{
+    //(*meH1) is a MonitorElementRootH1
+    //*(*meH1) is of type TNamed, although is actually a TH1::TNamed
+    //&(*(*meH1)) is of type TNamed*
+    TNamed* named_histo = &(*(*meH1));
+    TH1* histo = dynamic_cast<TH1*> (named_histo);
+    if(histo == 0){
+      edm::LogInfo("Tutorial") << "\n\nDynamic Cast error #2 !!!!!!!!\n\n";
+      return (TH1*)0;
+    }
+    else{
+      return histo;
+    }
+  }
 }
 
 TH2* MuIsoValidation::GetTH2FromMonitorElement(MonitorElement* me) {
-	MonitorElementRootH2* meH2 = dynamic_cast<MonitorElementRootH2*> (me);
-	if(meH2 == 0){
-		edm::LogInfo("Tutorial") << "\n\nDynamic Cast error #5 !!!!!!!!\n\n";
-		return (TH2*)0;
-	}
-	else{
-		TNamed* named_histo = &(*(*meH2));
-		TH2* histo = dynamic_cast<TH2*> (named_histo);
-		if(histo == 0){
-			edm::LogInfo("Tutorial") << "\n\nDynamic Cast error #6 !!!!!!!!\n\n";
-			return (TH2*)0;
-		}
-		else{
-			return histo;
-		}
-	}
+  //  return me->getTH2F();
+  MonitorElementRootH2* meH2 = dynamic_cast<MonitorElementRootH2*> (me);
+  if(meH2 == 0){
+    edm::LogInfo("Tutorial") << "\n\nDynamic Cast error #5 !!!!!!!!\n\n";
+    return (TH2*)0;
+  }
+  else{
+    TNamed* named_histo = &(*(*meH2));
+    TH2* histo = dynamic_cast<TH2*> (named_histo);
+    if(histo == 0){
+      edm::LogInfo("Tutorial") << "\n\nDynamic Cast error #6 !!!!!!!!\n\n";
+      return (TH2*)0;
+    }
+    else{
+      return histo;
+    }
+  }
 }
 
 TProfile* MuIsoValidation::GetTProfileFromMonitorElement(MonitorElement* me) {
-	MonitorElementRootProf* meProf = dynamic_cast<MonitorElementRootProf*> (me);
-	if(meProf == 0){
-		edm::LogInfo("Tutorial") << "\n\nDynamic Cast error #3 !!!!!!!!\n\n";
-		return (TProfile*)0;
-	}
-	else{
-		TNamed* named_prof = &(*(*meProf));
-		TProfile* prof = dynamic_cast<TProfile*> (named_prof);
-		if(prof == 0){
-			edm::LogInfo("Tutorial") << "\n\nDynamic Cast error #4 !!!!!!!!\n\n";
-			return (TProfile*)0;
-		}
-		else{
-			return prof;
-		}
-	}
+  //  return me->getTProfile();
+  MonitorElementRootProf* meProf = dynamic_cast<MonitorElementRootProf*> (me);
+  if(meProf == 0){
+    edm::LogInfo("Tutorial") << "\n\nDynamic Cast error #3 !!!!!!!!\n\n";
+    return (TProfile*)0;
+  }
+  else{
+    TNamed* named_prof = &(*(*meProf));
+    TProfile* prof = dynamic_cast<TProfile*> (named_prof);
+    if(prof == 0){
+      edm::LogInfo("Tutorial") << "\n\nDynamic Cast error #4 !!!!!!!!\n\n";
+      return (TProfile*)0;
+    }
+    else{
+      return prof;
+    }
+  }
 }
 
 
