@@ -66,6 +66,9 @@ MuIsoValidation::MuIsoValidation(const edm::ParameterSet& iConfig)
 {
 
 	rootfilename = iConfig.getUntrackedParameter<string>("rootfilename");
+	requireCombinedMuon = iConfig.getUntrackedParameter<bool>("requireCombinedMuon");
+	incMuonDirName = "incMuon";
+        combinedMuonDirName = "combinedMuon";
 
 	//--------Initialize tags-------
 	Muon_Tag = iConfig.getUntrackedParameter<edm::InputTag>("Global_Muon_Label");
@@ -76,13 +79,15 @@ MuIsoValidation::MuIsoValidation(const edm::ParameterSet& iConfig)
 
 
 	//-------Initialize counters----------------
-	nEvents = nMuons = 0;   
+	nEvents = nIncMuons = nCombinedMuons = 0;   
 
 	InitStatics();
 
 	//Set up DAQ
 	dbe = 0;
 	dbe = edm::Service<DaqMonitorBEInterface>().operator->();
+	//	if (requirecombinedMuon) dbe->setCurrentFolder(combinedMuonDirName.c_str());
+	//	else dbe->SetCurrentFolder(incMuonDirName.c_str());
 
 	//------"allocate" space for the data vectors-------
 	
@@ -101,6 +106,7 @@ MuIsoValidation::MuIsoValidation(const edm::ParameterSet& iConfig)
 	h_2D.resize(NUM_VARS, vector<MonitorElement*>     (NUM_VARS));
 	p_2D.resize(NUM_VARS, vector<MonitorElement*>(NUM_VARS));
 
+	dbe->cd();
 }
 
 //
@@ -126,7 +132,7 @@ void MuIsoValidation::InitStatics(){
 							//i.e.  bin widths are (x), (r*x), (r^2*x), ..., (r^(nbins)*x)
 							
 
-	//-------Initialize Titles---------
+	//-------Initalize Titles---------
 	title_sam = "";//"[Sample b-jet events] ";
 	title_cone = "";//" [in R=0.3 IsoDeposit Cone]";
 	//The above two pieces of info will be printed on the title of the whole page,
@@ -244,18 +250,24 @@ void MuIsoValidation::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 
 	//Fill historgams concerning muon isolation 
 	uint iMuon=0;
+	if (requireCombinedMuon) dbe->setCurrentFolder(combinedMuonDirName.c_str());
+	else dbe->setCurrentFolder(incMuonDirName.c_str());
 	for (MuonIterator muon = muonsHandle->begin(); muon != muonsHandle->end(); ++muon, ++iMuon ) {
-		++nMuons;
-		//		if (muon->combinedMuon().isNull()) continue;
-		edm::RefToBase<reco::Candidate> muRef(muonsHandle->refAt(iMuon));
-		MuIsoDepRef& ctfDep  = ( *ctfIsoHandle)[muRef];
-		MuIsoDepRef& ecalDep = (*ecalIsoHandle)[muRef];
-		MuIsoDepRef& hcalDep = (*hcalIsoHandle)[muRef];
-		MuIsoDepRef& hoDep   = (  *hoIsoHandle)[muRef];
-
-		RecordData(muon,ctfDep,ecalDep,hcalDep,hoDep);
-		FillHistos();
+	  ++nIncMuons;
+	  if (requireCombinedMuon) {
+	    if (dynamic_cast<const reco::Muon*>(&*muon)->combinedMuon().isNull()) continue;
+	  }
+	  ++nCombinedMuons;
+	  edm::RefToBase<reco::Candidate> muRef(muonsHandle->refAt(iMuon));
+	  MuIsoDepRef& ctfDep  = ( *ctfIsoHandle)[muRef];
+	  MuIsoDepRef& ecalDep = (*ecalIsoHandle)[muRef];
+	  MuIsoDepRef& hcalDep = (*hcalIsoHandle)[muRef];
+	  MuIsoDepRef& hoDep   = (  *hoIsoHandle)[muRef];
+	  
+	  RecordData(muon,ctfDep,ecalDep,hcalDep,hoDep);
+	  FillHistos();
 	}
+	dbe->cd();
    
 }
 
@@ -292,7 +304,15 @@ MuIsoValidation::beginJob(const edm::EventSetup&)
 	edm::LogInfo("Tutorial") << "\n#########################################\n\n"
 		<< "Lets get started! " 
 		<< "\n\n#########################################\n";
-	InitHistos();	
+	if (requireCombinedMuon) {
+	  dbe->setCurrentFolder(combinedMuonDirName.c_str());
+	  InitHistos();	
+	}
+	else {
+	  dbe->setCurrentFolder(incMuonDirName.c_str());
+	  InitHistos();
+	}
+	dbe->cd();
 }
 
 // ------------ method called once each job just after ending the event loop  ------------
@@ -301,7 +321,7 @@ MuIsoValidation::endJob() {
 
 	edm::LogInfo("Tutorial") << "\n#########################################\n\n"
 		<< "Total Number of Events: " << nEvents
-		<< "\nTotal Number of Muons: " << nMuons
+		<< "\nTotal Number of Muons: " << nIncMuons
 		<< "\n\n#########################################\n"
 		<< "\nInitializing Histograms...\n";
 
@@ -437,8 +457,14 @@ void MuIsoValidation::NormalizeHistos() {
       cd_plots[var]->setBinContent(n, cd_plots[var]->getBinContent(n) + cd_plots[var]->getBinContent(n-1)); //Integrate.
     }
     //----normalize------
-    GetTH1FromMonitorElement(h_1D[var])->Scale(1./nMuons);
-    GetTH1FromMonitorElement(cd_plots[var])->Scale(1./nMuons);    
+    if (requireCombinedMuon) {
+      GetTH1FromMonitorElement(h_1D[var])->Scale(1./nCombinedMuons);
+      GetTH1FromMonitorElement(cd_plots[var])->Scale(1./nCombinedMuons);
+    }
+    else {
+      GetTH1FromMonitorElement(h_1D[var])->Scale(1./nIncMuons);
+      GetTH1FromMonitorElement(cd_plots[var])->Scale(1./nIncMuons);    
+    }
   }
 }
 
