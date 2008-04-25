@@ -94,8 +94,7 @@ private:
   //root file name
   std::string rootfilename;
   // Directories within the rootfile
-  std::string incMuonDirName;
-  std::string combinedMuonDirName;
+  std::string dirName;
 
   //Histogram parameters
   static const int NUM_VARS = 11;

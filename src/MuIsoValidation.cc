@@ -67,8 +67,7 @@ MuIsoValidation::MuIsoValidation(const edm::ParameterSet& iConfig)
 
 	rootfilename = iConfig.getUntrackedParameter<string>("rootfilename");
 	requireCombinedMuon = iConfig.getUntrackedParameter<bool>("requireCombinedMuon");
-	incMuonDirName = "incMuon";
-        combinedMuonDirName = "combinedMuon";
+	dirName = iConfig.getParameter<std::string>("@module_label"); 
 
 	//--------Initialize tags-------
 	Muon_Tag = iConfig.getUntrackedParameter<edm::InputTag>("Global_Muon_Label");
@@ -250,8 +249,7 @@ void MuIsoValidation::analyze(const edm::Event& iEvent, const edm::EventSetup& i
 
 	//Fill historgams concerning muon isolation 
 	uint iMuon=0;
-	if (requireCombinedMuon) dbe->setCurrentFolder(combinedMuonDirName.c_str());
-	else dbe->setCurrentFolder(incMuonDirName.c_str());
+	dbe->setCurrentFolder(dirName.c_str());
 	for (MuonIterator muon = muonsHandle->begin(); muon != muonsHandle->end(); ++muon, ++iMuon ) {
 	  ++nIncMuons;
 	  if (requireCombinedMuon) {
@@ -304,14 +302,8 @@ MuIsoValidation::beginJob(const edm::EventSetup&)
 	edm::LogInfo("Tutorial") << "\n#########################################\n\n"
 		<< "Lets get started! " 
 		<< "\n\n#########################################\n";
-	if (requireCombinedMuon) {
-	  dbe->setCurrentFolder(combinedMuonDirName.c_str());
-	  InitHistos();	
-	}
-	else {
-	  dbe->setCurrentFolder(incMuonDirName.c_str());
-	  InitHistos();
-	}
+	dbe->setCurrentFolder(dirName.c_str());
+	InitHistos();
 	dbe->cd();
 }
 
